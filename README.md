@@ -11,6 +11,7 @@ RTX Video Super Resolution の後段で使う、イラスト向けの高速な�
 - 方向光、リムライト、鏡面ハイライト
 - 疑似アンビエントオクルージョン
 - Bloom、彩度、細部強調
+- `light_color` のカラーコード入力とカラーパレット選択
 - 任意の深度画像とエフェクトマスク
 - 静止画およびIMAGEバッチ（動画フレーム）対応
 - `subtle`、`anime_luxury`、`cinematic`、`jewel_glow`、`dramatic` プリセット
@@ -26,6 +27,8 @@ RTX Video Super Resolution の後段で使う、イラスト向けの高速な�
 3. `RTX Illustration / RTX Illustration Enhancer ✨` を追加します。
 
 追加パッケージのインストールは不要です。
+`🎨 choose light color` ボタンを押すとカラーパレットが開き、選択した色が
+`light_color` の `#RRGGBB` カラーコードへ自動反映されます。カラーコードの直接入力も引き続き利用できます。
 
 ## 推奨接続
 
