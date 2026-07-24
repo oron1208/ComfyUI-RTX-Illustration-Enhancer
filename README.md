@@ -1,5 +1,7 @@
 # RTX Illustration Enhancer for ComfyUI
 
+![RTX Illustration Enhancer preview](assets/preview.png)
+
 RTX Video Super Resolution の後段で使う、イラスト向けの高速な疑似レイトレーシング／豪華化ノードです。
 外部AIモデルを追加せず、ComfyUIに含まれるPyTorchだけで動作します。
 
