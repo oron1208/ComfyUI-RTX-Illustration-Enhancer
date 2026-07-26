@@ -222,10 +222,222 @@ class RTXIllustrationEnhancer:
         )
 
 
+def _nearest_color_name(value):
+    text = value.strip().lstrip("#")
+    if len(text) == 3:
+        text = "".join(character * 2 for character in text)
+    try:
+        rgb = tuple(int(text[index:index + 2], 16) for index in (0, 2, 4))
+    except (ValueError, IndexError):
+        return "warm golden"
+    colors = {
+        "warm golden": (255, 205, 145),
+        "warm white": (255, 238, 214),
+        "neutral white": (235, 240, 245),
+        "cool blue": (125, 190, 255),
+        "moonlight blue": (105, 135, 220),
+        "cyan": (75, 235, 245),
+        "emerald green": (70, 220, 145),
+        "magenta": (240, 85, 210),
+        "rose pink": (255, 125, 165),
+        "orange": (255, 145, 60),
+        "deep red": (220, 55, 55),
+        "violet": (145, 95, 245),
+    }
+    return min(
+        colors,
+        key=lambda name: sum((rgb[channel] - colors[name][channel]) ** 2 for channel in range(3)),
+    )
+
+
+class ICLightPromptBuilder:
+    DIRECTIONS = [
+        "left", "right", "top", "bottom", "front", "back_rim",
+        "top_left", "top_right", "window_left", "window_right",
+    ]
+    STYLES = [
+        "natural", "anime_luxury", "cinematic", "soft_studio",
+        "dramatic", "neon", "jewel_glow", "volumetric", "moonlight",
+    ]
+    TIMES = ["auto", "daylight", "golden_hour", "sunset", "night", "indoor"]
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "direction": (cls.DIRECTIONS, {"default": "top_left"}),
+                "style": (cls.STYLES, {"default": "anime_luxury"}),
+                "time_of_day": (cls.TIMES, {"default": "auto"}),
+                "light_color": ("STRING", {"default": "#ffd9ad"}),
+                "intensity": ("FLOAT", {"default": 0.65, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "preserve_character": ("BOOLEAN", {"default": True}),
+                "custom_prompt": ("STRING", {"default": "", "multiline": True}),
+            },
+        }
+
+    RETURN_TYPES = ("STRING", "STRING")
+    RETURN_NAMES = ("positive_prompt", "negative_prompt")
+    FUNCTION = "build"
+    CATEGORY = "RTX Illustration/IC-Light"
+    DESCRIPTION = "Builds IC-Light-friendly positive and negative relighting prompts."
+
+    def build(
+        self, direction, style, time_of_day, light_color,
+        intensity, preserve_character, custom_prompt,
+    ):
+        direction_prompts = {
+            "left": "key light coming from the left",
+            "right": "key light coming from the right",
+            "top": "overhead key light",
+            "bottom": "dramatic light coming from below",
+            "front": "soft frontal beauty light",
+            "back_rim": "strong backlight with elegant rim lighting",
+            "top_left": "key light coming from the upper left",
+            "top_right": "key light coming from the upper right",
+            "window_left": "natural window light entering from the left",
+            "window_right": "natural window light entering from the right",
+        }
+        style_prompts = {
+            "natural": "natural physically plausible illumination, gentle tonal transitions",
+            "anime_luxury": "luxurious anime illustration lighting, polished highlights, rich dimensional shading",
+            "cinematic": "cinematic lighting, deep controlled shadows, filmic contrast",
+            "soft_studio": "large softbox studio lighting, soft shadows, clean skin tones",
+            "dramatic": "dramatic high-contrast illumination, sculpted shadows",
+            "neon": "colorful neon lighting, luminous edge accents, cyberpunk atmosphere",
+            "jewel_glow": "radiant jewel-like highlights, magical sparkle, elegant glow",
+            "volumetric": "volumetric light rays, atmospheric light scattering, visible light beams",
+            "moonlight": "soft moonlight, cool nocturnal illumination, delicate rim light",
+        }
+        time_prompts = {
+            "auto": "",
+            "daylight": "clear daylight",
+            "golden_hour": "warm golden-hour sunlight",
+            "sunset": "rich sunset illumination",
+            "night": "night scene illumination",
+            "indoor": "controlled indoor illumination",
+        }
+        if intensity < 0.34:
+            intensity_prompt = "subtle low-intensity"
+        elif intensity < 0.72:
+            intensity_prompt = "balanced medium-intensity"
+        else:
+            intensity_prompt = "powerful high-intensity"
+        color_name = _nearest_color_name(light_color)
+        parts = [
+            direction_prompts[direction],
+            style_prompts[style],
+            time_prompts[time_of_day],
+            f"{intensity_prompt} {color_name} light",
+            "consistent light direction, coherent cast shadows, detailed highlights",
+        ]
+        if preserve_character:
+            parts.append(
+                "preserve the character identity, facial features, hairstyle, outfit design, "
+                "line art and original composition"
+            )
+        if custom_prompt.strip():
+            parts.append(custom_prompt.strip())
+        positive = ", ".join(part for part in parts if part)
+
+        negatives = [
+            "inconsistent lighting", "multiple conflicting shadows", "flat lighting",
+            "burned highlights", "crushed blacks", "color banding", "halo artifacts",
+        ]
+        if preserve_character:
+            negatives.extend([
+                "changed identity", "different face", "changed hairstyle",
+                "changed clothes", "deformed hands", "extra fingers", "distorted line art",
+            ])
+        return (positive, ", ".join(negatives))
+
+
+class ICLightDetailFinish:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "original": ("IMAGE",),
+                "ic_light_image": ("IMAGE",),
+                "relight_strength": ("FLOAT", {"default": 0.80, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "detail_recovery": ("FLOAT", {"default": 0.45, "min": 0.0, "max": 1.5, "step": 0.01}),
+                "color_preservation": ("FLOAT", {"default": 0.35, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "highlight_protection": ("FLOAT", {"default": 0.25, "min": 0.0, "max": 1.0, "step": 0.01}),
+            },
+            "optional": {
+                "effect_mask": ("MASK",),
+            },
+        }
+
+    RETURN_TYPES = ("IMAGE", "IMAGE")
+    RETURN_NAMES = ("finished", "relight_only")
+    FUNCTION = "finish"
+    CATEGORY = "RTX Illustration/IC-Light"
+    DESCRIPTION = "Restores original color and high-frequency illustration details after IC-Light."
+
+    def finish(
+        self, original, ic_light_image, relight_strength,
+        detail_recovery, color_preservation, highlight_protection,
+        effect_mask=None,
+    ):
+        source = _to_bchw(original).clamp(0, 1)
+        relit = _to_bchw(ic_light_image).to(device=source.device, dtype=source.dtype)
+        batch, _, height, width = source.shape
+        relit = F.interpolate(relit, size=(height, width), mode="bicubic", align_corners=False)
+        if relit.shape[0] == 1 and batch > 1:
+            relit = relit.expand(batch, -1, -1, -1)
+        elif source.shape[0] == 1 and relit.shape[0] > 1:
+            source = source.expand(relit.shape[0], -1, -1, -1)
+            batch = relit.shape[0]
+        else:
+            common_batch = min(batch, relit.shape[0])
+            source, relit, batch = source[:common_batch], relit[:common_batch], common_batch
+
+        relit = relit.clamp(0, 1)
+        source_luma = (
+            0.2126 * source[:, 0:1]
+            + 0.7152 * source[:, 1:2]
+            + 0.0722 * source[:, 2:3]
+        )
+        relit_luma = (
+            0.2126 * relit[:, 0:1]
+            + 0.7152 * relit[:, 1:2]
+            + 0.0722 * relit[:, 2:3]
+        )
+        source_chroma = source - source_luma
+        relit_chroma = relit - relit_luma
+        preserved_color = relit_luma + (
+            relit_chroma * (1.0 - color_preservation)
+            + source_chroma * color_preservation
+        )
+
+        radius = max(1, min(height, width) // 512)
+        original_detail = source - _gaussian_blur(source, radius)
+        worked = preserved_color + original_detail * detail_recovery
+
+        if highlight_protection > 0:
+            highlight_mask = ((worked - 0.72) / 0.28).clamp(0, 1)
+            compressed = 0.72 + (worked - 0.72).clamp(min=0) / (
+                1.0 + highlight_protection * 2.5 * (worked - 0.72).clamp(min=0)
+            )
+            worked = worked * (1.0 - highlight_mask * highlight_protection) + compressed * (
+                highlight_mask * highlight_protection
+            )
+
+        finished = source * (1.0 - relight_strength) + worked * relight_strength
+        mask = _mask_tensor(effect_mask, batch, height, width, source.device, source.dtype)
+        if mask is not None:
+            finished = source * (1.0 - mask) + finished * mask
+        return (_to_bhwc(finished), _to_bhwc(relit))
+
+
 NODE_CLASS_MAPPINGS = {
     "RTXIllustrationEnhancer": RTXIllustrationEnhancer,
+    "ICLightPromptBuilder": ICLightPromptBuilder,
+    "ICLightDetailFinish": ICLightDetailFinish,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "RTXIllustrationEnhancer": "RTX Illustration Enhancer ✨",
+    "ICLightPromptBuilder": "IC-Light Prompt Builder 💡",
+    "ICLightDetailFinish": "IC-Light Detail Finish ✨",
 }
