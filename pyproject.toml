@@ -1,6 +1,6 @@
 [project]
 name = "comfyui-rtx-illustration-enhancer"
-version = "0.1.1"
+version = "0.2.0"
 description = "Fast pseudo-ray-traced relighting and detail enhancement node for ComfyUI illustrations"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -8,3 +8,4 @@ license = { text = "MIT" }
 [tool.comfy]
 PublisherId = "local"
 DisplayName = "RTX Illustration Enhancer"
+
