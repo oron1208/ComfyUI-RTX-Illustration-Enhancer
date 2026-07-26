@@ -12,6 +12,8 @@ RTX Video Super Resolution の後段で使う、イラスト向けの高速な�
 - 疑似アンビエントオクルージョン
 - Bloom、彩度、細部強調
 - `light_color` のカラーコード入力とカラーパレット選択
+- IC-Light用の照明プロンプト生成
+- IC-Light出力から原画の色・線・細部を復元する仕上げノード
 - 任意の深度画像とエフェクトマスク
 - 静止画およびIMAGEバッチ（動画フレーム）対応
 - `subtle`、`anime_luxury`、`cinematic`、`jewel_glow`、`dramatic` プリセット
@@ -61,3 +63,29 @@ RTX Video Super Resolution の後段で使う、イラスト向けの高速な�
 - 強い陰影：`dramatic`
 
 効果が強すぎる場合は `custom` に切り替え、`original_preservation` を0.75以上にしてください。
+
+## IC-Light連携（v0.2.0）
+
+IC-Light本体は同梱していません。ComfyUI-Managerから
+[`kijai/ComfyUI-IC-Light`](https://github.com/kijai/ComfyUI-IC-Light) を別途インストールしてください。
+IC-Light未導入でも、このパッケージのノードは通常どおり読み込まれます。
+
+### IC-Light Prompt Builder 💡
+
+光源方向、スタイル、時間帯、色、強度を選択すると、IC-Lightへ渡す
+`positive_prompt` と `negative_prompt` を生成します。出力を通常のCLIP Text Encodeへ接続してください。
+
+### IC-Light Detail Finish ✨
+
+`original` にIC-Light処理前の画像、`ic_light_image` にIC-Light処理後の画像を接続します。
+
+- `relight_strength`: IC-Light結果を使う割合
+- `detail_recovery`: 元画像の線や高周波ディテールを戻す量
+- `color_preservation`: 元画像の配色を保持する量
+- `highlight_protection`: 白飛びを抑える量
+- `effect_mask`: 白い部分だけIC-Light結果を適用
+
+推奨順序：
+
+`入力 → RTX Video Super Resolution → IC-Light → IC-Light Detail Finish → RTX Illustration Enhancer`
+
